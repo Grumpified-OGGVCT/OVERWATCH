@@ -1,7 +1,7 @@
 """Process remediation module with safety mechanisms."""
 import psutil
 import logging
-from typing import Dict, Optional
+from typing import Dict
 import time
 
 logger = logging.getLogger(__name__)
