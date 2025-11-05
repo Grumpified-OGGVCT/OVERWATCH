@@ -1,7 +1,6 @@
 """Process detection and analysis module."""
 import psutil
 from typing import List, Dict
-from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
