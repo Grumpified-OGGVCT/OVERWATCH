@@ -258,8 +258,8 @@ def extract_process_info_from_alert(alert: dict) -> dict:
 def receive_alert():
     """Receive and process alerts from Alertmanager."""
     # Verify token (simplified for demo, use proper auth in production)
-    # if not verify_webhook_token():
-    #     return jsonify({'error': 'Unauthorized'}), 401
+    if not verify_webhook_token():
+        return jsonify({'error': 'Unauthorized'}), 401
     
     try:
         payload = request.json
