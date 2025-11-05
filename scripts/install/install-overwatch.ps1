@@ -160,7 +160,7 @@ if (-not $SkipExecutor) {
     if ($existingService) {
         Write-Host "  Removing existing service..."
         & $nssmPath stop $svcName
-        & $nssmPath remove $svcName confirm
+        & $nssmPath remove $svcName -confirm
     }
     
     Write-Host "  Installing service..."
