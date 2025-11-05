@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir flask prometheus-client requests python-dotenv
+
+# Copy application code
+COPY database/ ./database/
+COPY ai_layer/ ./ai_layer/
+
+# Expose port
+EXPOSE 5000
+
+# Run Flask webhook
+CMD ["python", "ai_layer/flask_webhook.py"]

@@ -1,0 +1,45 @@
+# Prometheus configuration for OVERWATCH
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'overwatch'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Load alert rules
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Windows Exporter (process metrics)
+  - job_name: 'windows_exporter'
+    static_configs:
+      - targets: ['host.docker.internal:9182']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'windows-host'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # AI Layer (Flask webhook)
+  - job_name: 'ai_layer'
+    static_configs:
+      - targets: ['ai_layer:5000']
+    metrics_path: '/metrics'
+
+  # PowerShell Executor
+  - job_name: 'executor'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: '/metrics'

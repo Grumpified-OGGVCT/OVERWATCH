@@ -1,0 +1,122 @@
+# OVERWATCH Alert Rules for Process Monitoring
+groups:
+  - name: orphaned_processes
+    interval: 30s
+    rules:
+      # Orphaned Process Detection
+      - alert: OrphanedProcess
+        expr: |
+          windows_process_creating_process_id == 0
+          and windows_process_pid > 1000
+          and (time() - windows_process_start_time) > 3600
+        for: 5m
+        labels:
+          severity: warning
+          category: orphaned
+        annotations:
+          summary: "Orphaned process detected: {{ $labels.process }}"
+          description: "Process {{ $labels.process }} (PID {{ $labels.pid }}) has no parent and has been running for over 1 hour"
+          pid: "{{ $labels.pid }}"
+          process_name: "{{ $labels.process }}"
+
+  - name: zombie_processes
+    interval: 30s
+    rules:
+      # Pseudo-Zombie Detection (high memory, low CPU, old)
+      - alert: PseudoZombieProcess
+        expr: |
+          (windows_process_private_bytes / 1024 / 1024) > 50
+          and rate(windows_process_cpu_time_total[5m]) < 0.01
+          and (time() - windows_process_start_time) > 300
+        for: 5m
+        labels:
+          severity: info
+          category: zombie
+        annotations:
+          summary: "Pseudo-zombie process detected: {{ $labels.process }}"
+          description: "Process {{ $labels.process }} (PID {{ $labels.pid }}) is holding >50MB memory with minimal CPU activity for >5 minutes"
+          pid: "{{ $labels.pid }}"
+          process_name: "{{ $labels.process }}"
+          memory_mb: "{{ $value }}"
+
+  - name: resource_leeching
+    interval: 15s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUProcess
+        expr: |
+          rate(windows_process_cpu_time_total[1m]) > 0.8
+          and (time() - windows_process_start_time) > 300
+        for: 2m
+        labels:
+          severity: warning
+          category: resource_leeching
+        annotations:
+          summary: "High CPU usage by process: {{ $labels.process }}"
+          description: "Process {{ $labels.process }} (PID {{ $labels.pid }}) is using >80% CPU for >2 minutes"
+          pid: "{{ $labels.pid }}"
+          process_name: "{{ $labels.process }}"
+          cpu_percent: "{{ $value | humanizePercentage }}"
+
+      # High Memory Usage
+      - alert: HighMemoryProcess
+        expr: |
+          (windows_process_private_bytes / windows_cs_physical_memory_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: resource_leeching
+        annotations:
+          summary: "High memory usage by process: {{ $labels.process }}"
+          description: "Process {{ $labels.process }} (PID {{ $labels.pid }}) is using >80% of system memory"
+          pid: "{{ $labels.pid }}"
+          process_name: "{{ $labels.process }}"
+          memory_percent: "{{ $value | humanizePercentage }}"
+
+      # Memory Leak Detection (growing memory over time)
+      - alert: MemoryLeakSuspect
+        expr: |
+          deriv(windows_process_private_bytes[15m]) > 10485760
+          and (time() - windows_process_start_time) > 1800
+        for: 10m
+        labels:
+          severity: info
+          category: resource_leeching
+        annotations:
+          summary: "Possible memory leak in process: {{ $labels.process }}"
+          description: "Process {{ $labels.process }} (PID {{ $labels.pid }}) memory is growing at >10MB/15min"
+          pid: "{{ $labels.pid }}"
+          process_name: "{{ $labels.process }}"
+
+  - name: system_health
+    interval: 30s
+    rules:
+      # Too many processes
+      - alert: ProcessCountHigh
+        expr: count(windows_process_pid) > 500
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "High process count detected"
+          description: "System has {{ $value }} processes running, which may indicate a problem"
+
+      # Executor health check
+      - alert: ExecutorDown
+        expr: up{job="executor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PowerShell Executor is down"
+          description: "The PowerShell executor service is not responding"
+
+      # AI Layer health check
+      - alert: AILayerDown
+        expr: up{job="ai_layer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI Layer is down"
+          description: "The AI reasoning layer (Flask) is not responding"
