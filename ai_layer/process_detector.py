@@ -108,7 +108,8 @@ class ProcessDetector:
         
         # Check if parent exists
         try:
-            parent_proc = psutil.Process(proc_info.parent_pid)
+            # Attempt to instantiate parent process; if it doesn't exist, exception is raised
+            psutil.Process(proc_info.parent_pid)
             return False
         except psutil.NoSuchProcess:
             # Parent doesn't exist, but check if this is a system process
