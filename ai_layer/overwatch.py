@@ -1,8 +1,6 @@
 """Main orchestrator for OVERWATCH system."""
 import logging
 import sys
-from pathlib import Path
-
 from config import Config
 from process_detector import ProcessDetector
 from llm_decision import LLMDecisionEngine
