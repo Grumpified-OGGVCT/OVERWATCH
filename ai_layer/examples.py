@@ -7,7 +7,6 @@ This demonstrates how to use the OVERWATCH system programmatically.
 from config import Config
 from process_detector import ProcessDetector
 from llm_decision import LLMDecisionEngine
-from remediator import ProcessRemediator
 from audit_logger import AuditLogger
 import logging
 
