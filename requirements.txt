@@ -6,6 +6,8 @@ python-dotenv>=1.0.0
 # Flask AI Layer
 flask>=3.0.0
 prometheus-client>=0.19.0
+pyyaml>=6.0
+jsonschema>=4.20.0
 
 # Streamlit UI
 streamlit>=1.29.0
@@ -13,3 +15,11 @@ pandas>=2.0.0
 
 # Database
 # sqlite3 is included in Python standard library
+
+# Testing (dev dependencies)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+flake8>=6.1.0
+black>=23.12.0
+safety>=2.3.0
+bandit>=1.7.5

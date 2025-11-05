@@ -1,0 +1,218 @@
+name: OVERWATCH CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov jsonschema pyyaml
+      
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/test_remediator.py -v --cov=ai_layer --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pylint black
+      
+      - name: Run flake8
+        run: |
+          flake8 ai_layer/ ui/ database/ --max-line-length=120 --ignore=E501,W503
+      
+      - name: Check code formatting
+        run: |
+          black --check ai_layer/ ui/ database/
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+      
+      - name: Run safety check
+        run: |
+          pip install -r requirements.txt
+          safety check --json
+      
+      - name: Run bandit
+        run: |
+          bandit -r ai_layer/ ui/ database/ -f json -o bandit-report.json
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build AI Layer image
+        run: |
+          docker build -f Dockerfile.ai_layer -t overwatch-ai-layer:${{ github.sha }} .
+      
+      - name: Build UI image
+        run: |
+          docker build -f Dockerfile.ui -t overwatch-ui:${{ github.sha }} .
+      
+      - name: Scan images for vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image overwatch-ai-layer:${{ github.sha }}
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image overwatch-ui:${{ github.sha }}
+
+  validate-configs:
+    name: Validate Configurations
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate Prometheus config
+        run: |
+          docker run --rm -v $(pwd)/monitoring/prometheus:/prometheus \
+            prom/prometheus:latest \
+            promtool check config /prometheus/prometheus.yml
+      
+      - name: Validate alert rules
+        run: |
+          docker run --rm -v $(pwd)/monitoring/prometheus:/prometheus \
+            prom/prometheus:latest \
+            promtool check rules /prometheus/rules/process_alerts.yml
+      
+      - name: Validate Grafana dashboard
+        run: |
+          # Install jq for JSON validation
+          sudo apt-get install -y jq
+          jq empty monitoring/grafana/dashboards/process-explorer.json
+
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check Markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          folder-path: 'docs/'
+      
+      - name: Validate documentation structure
+        run: |
+          test -f docs/INSTALLATION.md
+          test -f docs/SECURITY.md
+          test -f README.md
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Start services
+        run: |
+          # This would start a test environment
+          # For now, we skip actual integration tests
+          echo "Integration tests would run here"
+      
+      - name: Run integration tests
+        run: |
+          echo "Skipping integration tests (requires full environment)"
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, build, validate-configs]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "## Changes in this release" > CHANGELOG.md
+          git log --oneline --no-merges $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD >> CHANGELOG.md
+      
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false

@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OVERWATCH LLM Response Schema",
+  "description": "Schema for validating LLM responses from process analysis",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["kill", "manual", "safe_check"],
+      "description": "The recommended action: kill (terminate process), manual (needs human review), or safe_check (requires confirmation)"
+    },
+    "pid": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Process ID to act upon"
+    },
+    "command": {
+      "type": "string",
+      "pattern": "^Stop-Process -Id \\d+ -Force$",
+      "description": "PowerShell command to execute (must match expected pattern)"
+    },
+    "note": {
+      "type": "string",
+      "description": "Explanation for kill action"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Explanation for manual or safe_check action"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score for the recommendation (0.0 to 1.0)"
+    }
+  },
+  "required": ["action"],
+  "oneOf": [
+    {
+      "properties": {
+        "action": { "const": "kill" }
+      },
+      "required": ["action", "pid", "command", "note", "confidence"]
+    },
+    {
+      "properties": {
+        "action": { "const": "manual" }
+      },
+      "required": ["action", "reason", "confidence"]
+    },
+    {
+      "properties": {
+        "action": { "const": "safe_check" }
+      },
+      "required": ["action", "reason", "confidence"]
+    }
+  ]
+}
