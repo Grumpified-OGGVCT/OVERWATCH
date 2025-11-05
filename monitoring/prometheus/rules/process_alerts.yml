@@ -6,7 +6,7 @@ groups:
       # Orphaned Process Detection
       - alert: OrphanedProcess
         expr: |
-          windows_process_creating_process_id == 0
+          windows_process_owner == ""
           and windows_process_pid > 1000
           and (time() - windows_process_start_time) > 3600
         for: 5m
