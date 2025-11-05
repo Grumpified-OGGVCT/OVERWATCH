@@ -1,0 +1,52 @@
+# Alertmanager configuration for OVERWATCH
+global:
+  resolve_timeout: 5m
+
+# Route configuration
+route:
+  receiver: 'overwatch-webhook'
+  group_by: ['alertname', 'category']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  
+  routes:
+    # Critical alerts go directly to webhook
+    - match:
+        severity: critical
+      receiver: 'overwatch-webhook'
+      group_wait: 0s
+      repeat_interval: 5m
+    
+    # Process alerts (orphaned, zombie, resource_leeching)
+    - match_re:
+        category: (orphaned|zombie|resource_leeching)
+      receiver: 'overwatch-webhook'
+      group_wait: 30s
+      repeat_interval: 30m
+
+# Receivers configuration
+receivers:
+  - name: 'overwatch-webhook'
+    webhook_configs:
+      - url: 'http://ai_layer:5000/webhook/alert'
+        send_resolved: true
+        http_config:
+          bearer_token: '${WEBHOOK_TOKEN}'
+        max_alerts: 0
+
+# Inhibition rules (prevent alert flooding)
+inhibit_rules:
+  # Don't alert on processes if the executor is down
+  - source_match:
+      alertname: 'ExecutorDown'
+    target_match_re:
+      alertname: '(OrphanedProcess|PseudoZombieProcess|HighCPUProcess|HighMemoryProcess)'
+    equal: ['instance']
+  
+  # Don't alert on processes if AI layer is down
+  - source_match:
+      alertname: 'AILayerDown'
+    target_match_re:
+      alertname: '(OrphanedProcess|PseudoZombieProcess|HighCPUProcess|HighMemoryProcess)'
+    equal: ['instance']
