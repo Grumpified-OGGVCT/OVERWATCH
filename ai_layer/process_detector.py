@@ -1,6 +1,6 @@
 """Process detection and analysis module."""
 import psutil
-from typing import List, Dict, Optional
+from typing import List, Dict
 from datetime import datetime
 import logging
 
